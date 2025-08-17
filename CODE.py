@@ -1,6 +1,7 @@
 import datetime
 import random
-
+from typing import List, Dict, Optional
+                      
 class Driver:
     def __init__(self, name):
         self.name = name
@@ -27,7 +28,7 @@ class User:
 class Ride:
     _id_counter = 1
     
-    def __init__(self, user, driver, pickup, drop, distance):
+    def __init__(self, user, driver, pickup, drop, distance, ride_type="private"):
         self.ride_id = Ride._id_counter
         Ride._id_counter += 1
         self.user = user
@@ -35,6 +36,7 @@ class Ride:
         self.pickup = pickup
         self.drop = drop
         self.distance = distance
+        self.ride_type = ride_type
         self.fare = self.calculate_fare()
         self.status = "Ongoing"
         self.date = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -45,11 +47,47 @@ class Ride:
         per_km_rate = 15.0
         return base_fare + (self.distance * per_km_rate)
 
+class SharedRide:
+    _id_counter = 1
+    
+    def __init__(self, driver, pickup, drop, distance, max_passengers=4):
+        self.shared_ride_id = SharedRide._id_counter
+        SharedRide._id_counter += 1
+        self.driver = driver
+        self.pickup = pickup
+        self.drop = drop
+        self.distance = distance
+        self.max_passengers = max_passengers
+        self.current_passengers = []
+        self.status = "Waiting"
+        self.date = datetime.datetime.now().strftime("%Y-%m-%d")
+        self.individual_fare = self.calculate_shared_fare()
+    
+    def calculate_shared_fare(self):
+        base_fare = 50.0
+        per_km_rate = 15.0
+        total_fare = base_fare + (self.distance * per_km_rate)
+        return total_fare / max(1, len(self.current_passengers))
+    
+    def add_passenger(self, user):
+        if len(self.current_passengers) < self.max_passengers:
+            self.current_passengers.append(user)
+            self.individual_fare = self.calculate_shared_fare()
+            return True
+        return False
+    
+    def is_full(self):
+        return len(self.current_passengers) >= self.max_passengers
+    
+    def get_passenger_count(self):
+        return len(self.current_passengers)
+
 class CabService:
     def __init__(self):
         self.drivers = []
         self.users = []
         self.rides = []
+        self.shared_rides = []
         self.initialize_system()
     
     def initialize_system(self):
@@ -236,16 +274,115 @@ class CabService:
             except ValueError:
                 print("Invalid input! Please enter a number.")
     
+    def create_shared_ride(self, user):
+        if len(self.shared_rides) >= 20:
+            print("Maximum shared rides reached!")
+            return
+        
+        driver = self.find_available_driver()
+        if not driver:
+            print("No available drivers at the moment. Please try again later.")
+            return
+        
+        pickup = input("Enter pickup location: ")
+        drop = input("Enter drop location: ")
+        try:
+            distance = float(input("Enter distance in km: "))
+            if distance <= 0:
+                print("Distance must be positive!")
+                return
+        except ValueError:
+            print("Invalid distance format!")
+            return
+        
+        new_shared_ride = SharedRide(driver, pickup, drop, distance)
+        new_shared_ride.add_passenger(user)
+        self.shared_rides.append(new_shared_ride)
+        driver.available = False
+        
+        print("\n=== Shared Ride Created ===")
+        print(f"Shared Ride ID: {new_shared_ride.shared_ride_id}")
+        print(f"Driver: {driver.name}")
+        print(f"Pickup: {pickup}")
+        print(f"Drop: {drop}")
+        print(f"Distance: {distance:.2f} km")
+        print(f"Your Fare: Rs. {new_shared_ride.individual_fare:.2f}")
+        print(f"Passengers: {new_shared_ride.get_passenger_count()}/{new_shared_ride.max_passengers}")
+        print(f"Status: {new_shared_ride.status}")
+    
+    def join_shared_ride(self, user):
+        available_shared_rides = [sr for sr in self.shared_rides 
+                                 if sr.status == "Waiting" and not sr.is_full()]
+        
+        if not available_shared_rides:
+            print("No available shared rides to join!")
+            return
+        
+        print("\n=== Available Shared Rides ===")
+        for i, ride in enumerate(available_shared_rides, 1):
+            print(f"{i}. Shared Ride ID: {ride.shared_ride_id}")
+            print(f"   Driver: {ride.driver.name}")
+            print(f"   Route: {ride.pickup} → {ride.drop}")
+            print(f"   Distance: {ride.distance:.2f} km")
+            print(f"   Current Passengers: {ride.get_passenger_count()}/{ride.max_passengers}")
+            print(f"   Your Fare: Rs. {ride.individual_fare:.2f}")
+            print("-" * 30)
+        
+        try:
+            choice = int(input("Enter ride number to join (0 to cancel): "))
+            if choice == 0:
+                return
+            
+            if 1 <= choice <= len(available_shared_rides):
+                selected_ride = available_shared_rides[choice - 1]
+                if selected_ride.add_passenger(user):
+                    print(f"Successfully joined shared ride {selected_ride.shared_ride_id}!")
+                    print(f"Updated fare: Rs. {selected_ride.individual_fare:.2f}")
+                    print(f"Total passengers: {selected_ride.get_passenger_count()}")
+                    
+                    if selected_ride.is_full():
+                        selected_ride.status = "Ready"
+                        print("Ride is now full and ready to depart!")
+                else:
+                    print("Failed to join ride - may be full!")
+            else:
+                print("Invalid choice!")
+        except ValueError:
+            print("Invalid input format!")
+    
+    def display_shared_rides(self):
+        print("\n=== All Shared Rides ===")
+        if not self.shared_rides:
+            print("No shared rides available.")
+            return
+        
+        for ride in self.shared_rides:
+            print(f"\nShared Ride ID: {ride.shared_ride_id}")
+            print(f"Driver: {ride.driver.name}")
+            print(f"Route: {ride.pickup} → {ride.drop}")
+            print(f"Distance: {ride.distance:.2f} km")
+            print(f"Status: {ride.status}")
+            print(f"Passengers: {ride.get_passenger_count()}/{ride.max_passengers}")
+            print(f"Individual Fare: Rs. {ride.individual_fare:.2f}")
+            if ride.current_passengers:
+                print("Passengers:")
+                for passenger in ride.current_passengers:
+                    print(f"  - {passenger.name}")
+            print("-" * 30)
+    
     def display_user_menu(self, user):
         while True:
             print(f"\n=== User Menu ({user.name}) ===")
             print("1. Request New Ride")
-            print("2. View Ride History")
-            print("3. Complete Ride")
-            print("4. Cancel Ride")
-            print("5. Rate Driver")
-            print("6. View Available Drivers")
-            print("7. Logout")
+            print("2. Request Shared Ride")
+            print("3. Join Shared Ride")
+            print("4. View Ride History")
+            print("5. View Shared Rides")
+            print("6. Complete Ride")
+            print("7. Cancel Ride")
+            print("8. Rate Driver")
+            print("9. View Available Drivers")
+            print("10. Logout")
             
             try:
                 choice = int(input("Enter your choice: "))
@@ -253,29 +390,35 @@ class CabService:
                 if choice == 1:
                     self.request_ride(user)
                 elif choice == 2:
-                    self.display_ride_history(user)
+                    self.create_shared_ride(user)
                 elif choice == 3:
+                    self.join_shared_ride(user)
+                elif choice == 4:
+                    self.display_ride_history(user)
+                elif choice == 5:
+                    self.display_shared_rides()
+                elif choice == 6:
                     try:
                         ride_id = int(input("Enter ride ID to complete: "))
                         self.complete_ride(ride_id)
                     except ValueError:
                         print("Invalid ride ID format!")
-                elif choice == 4:
+                elif choice == 7:
                     try:
                         ride_id = int(input("Enter ride ID to cancel: "))
                         self.cancel_ride(ride_id)
                     except ValueError:
                         print("Invalid ride ID format!")
-                elif choice == 5:
+                elif choice == 8:
                     try:
                         ride_id = int(input("Enter ride ID to rate: "))
                         rating = float(input("Enter rating (1-5): "))
                         self.rate_driver(ride_id, rating)
                     except ValueError:
                         print("Invalid input format!")
-                elif choice == 6:
+                elif choice == 9:
                     self.display_available_drivers()
-                elif choice == 7:
+                elif choice == 10:
                     break
                 else:
                     print("Invalid choice! Please try again.")
@@ -305,7 +448,7 @@ class CabService:
                     print("Thank you for using our cab service!")
                     break
                 else:
-                    print("Invalid choice!! Please try again.")
+                    print("Invalid choice! Please try again.")
             except ValueError:
                 print("Invalid input! Please enter a number.")
 
