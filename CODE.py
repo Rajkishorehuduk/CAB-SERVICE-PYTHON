@@ -249,7 +249,9 @@ class CabService:
             print("2. View All Drivers")
             print("3. View All Users")
             print("4. View All Rides")
-            print("5. Back to Main Menu")
+            print("5. View All Shared Rides")
+            print("6. Complete Shared Ride")  # <--- Added menu option
+            print("7. Back to Main Menu")
             
             try:
                 choice = int(input("Enter your choice: "))
@@ -268,6 +270,14 @@ class CabService:
                     for ride in self.rides:
                         print(f"Ride ID: {ride.ride_id}, User: {ride.user.name}, Driver: {ride.driver.name}, Status: {ride.status}")
                 elif choice == 5:
+                    self.display_shared_rides()
+                elif choice == 6:  # <--- Handle complete shared ride
+                    try:
+                        shared_ride_id = int(input("Enter shared ride ID to complete: "))
+                        self.complete_shared_ride(shared_ride_id)
+                    except ValueError:
+                        print("Invalid shared ride ID format!")
+                elif choice == 7:
                     break
                 else:
                     print("Invalid choice! Please try again.")
@@ -370,6 +380,18 @@ class CabService:
                     print(f"  - {passenger.name}")
             print("-" * 30)
     
+    # NEW: Complete shared ride
+    def complete_shared_ride(self, shared_ride_id):
+        for ride in self.shared_rides:
+            if ride.shared_ride_id == shared_ride_id and ride.status in ("Ready", "Ongoing"):
+                ride.status = "Completed"
+                ride.driver.available = True
+                ride.driver.total_rides += 1
+                print(f"Shared Ride {shared_ride_id} completed successfully!")
+                print(f"Total fare per passenger: Rs. {ride.individual_fare:.2f}")
+                return
+        print("Shared Ride not found or not ready/ongoing!")
+    
     def display_user_menu(self, user):
         while True:
             print(f"\n=== User Menu ({user.name}) ===")
@@ -382,7 +404,8 @@ class CabService:
             print("7. Cancel Ride")
             print("8. Rate Driver")
             print("9. View Available Drivers")
-            print("10. Logout")
+            print("10. Complete Shared Ride")  # <--- Added menu option
+            print("11. Logout")
             
             try:
                 choice = int(input("Enter your choice: "))
@@ -418,7 +441,13 @@ class CabService:
                         print("Invalid input format!")
                 elif choice == 9:
                     self.display_available_drivers()
-                elif choice == 10:
+                elif choice == 10:  # <--- Handle complete shared ride
+                    try:
+                        shared_ride_id = int(input("Enter shared ride ID to complete: "))
+                        self.complete_shared_ride(shared_ride_id)
+                    except ValueError:
+                        print("Invalid shared ride ID format!")
+                elif choice == 11:
                     break
                 else:
                     print("Invalid choice! Please try again.")
