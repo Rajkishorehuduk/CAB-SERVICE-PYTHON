@@ -16,7 +16,7 @@ class Driver:
         self.rating = self.total_rating / self.total_rides
 
 class User:
-    _id_counter = 1
+    _id_counter =  1
     
     def __init__(self, name, phone, email):
         self.id = User._id_counter
